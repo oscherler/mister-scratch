@@ -39,6 +39,8 @@ Replace `192.168.1.118` with the IP address of your DE10-Nano.
 
 ## Minimal Core
 
+_Git tag: `minimal-core`_
+
 For a minimal core that does nothing, we only need three files, that we put in the `hdl` folder:
 
 * `jtscratch.qip`: the list of HDL files to compile;
@@ -164,3 +166,84 @@ make
 On my machine, it takes seven minutes, complains that “some SDRAM signals are not IO registers,” and prints a large “FAIL scratch” in ASCII art, but the resulting RBF file still runs, as we don’t use the SDRAM.
 
 The RBF is located at `mister/output_1/jtscratch.rbf`, and you can install it on your MiSTer by sending to `/media/fat` it via SSH using `make copy`, or by copying it via SMB at the root of the `fat` share.
+
+## Video
+
+_Git tag: `video-grid`_
+
+Next we will add some video output. First we add a new file, `hdl/scratch_video.v`. This module will take `rst` and `clk`, the 48 MHz system clock, as inputs, and generate:
+
+* The 6 MHz and 12 MHz pixel clock enables, `pxl_cen` and `pxl2_cen`;
+* The horizontal and vertical blanking signals, `LHBL_dly` and `LVBL_dly`;
+* The horizontal and vertical sync signaly, `HS` and `VS`;
+* The RGB pixel values, `red`, `green`, and `blue`.
+
+For the pixel clock enables, we use the `jtframe_cen48` module, that takes the 48 MHz system clock and generates a number of clock enable signals from it.
+
+For the blanking and sync signals, we use the `jtframe_vtimer` (video timer) module. It takes a number of parameters to configure the desired video mode, based on the value of its horizontal and vertical counters. We are going to choose a resolution of 256x224 pixels, so we take the values we found in Bubble Bobble and adjust them a bit:
+
+* the horizontal blanking signal starts after 255 pixels (`HB_START`);
+* the horizontal sync signal starts 32 pixels later (front porch), at 287 (`HS_START`);
+* by default, the horizontal sync signal lasts for 27 pixels;
+* the horizontal blanking signal ends 69 pixels later (back porch), at 383 (`HB_END`);
+* the vertical blanking signal starts after 223 lines (`VB_START`);
+* the vertical sync signal starts 10 lines later (front porch), at 233 (`VS_START`);
+* by default, the vertical sync signal lasts for 3 lines;
+* the vertical blanking signal ends 30 lines later (back porch), at 263 (`VB_END`).
+
+In addition to the blanking and sync signals, we also output the horizontal and vertical counters, `H` and `vdump`, to generate our grid.
+
+```
+jtframe_vtimer #(
+	.HB_START( 9'd255 ),
+	.HS_START( 9'd287 ),
+	.HB_END  ( 9'd383 ),
+	.VB_START( 9'd223 ),
+	.VS_START( 9'd233 ),
+	.VB_END  ( 9'd263 )
+)
+u_timer(
+	.clk        ( clk           ),
+	.pxl_cen    ( pxl_cen       ),
+	.vdump      ( V             ),
+	.vrender    (               ),
+	.vrender1   (               ),
+	.H          ( H             ),
+	.Hinit      (               ),
+	.Vinit      (               ),
+	.LHBL       ( LHBL          ),
+	.LVBL       ( LVBL          ),
+	.HS         ( HS            ),
+	.VS         ( VS            )
+);
+```
+
+For the grid, we are going to test bit 4 of the horizontal and vertical counters, to draw 16x16 pixel squares:
+
+```
+reg  [3:0] r, g, b;
+
+always @( posedge clk ) if( pxl_cen ) begin
+	r <= 4'h0;
+	g <= H[4] == 1'b0 ? 4'h0 : 4'hf;
+	b <= V[4] == 1'b0 ? 4'h0 : 4'hf;
+```
+
+When bit 4 of the horizontal counter is 0, we output a green horizontal band. When bit 4 of the vertical counter is 0, we output a blue vertical band. When they intersect, we get a cyan square.
+
+Finally, we pass the video signals to a `jtframe_blank` instance, that will set the pixels to black during horizontal and vertical blanking. It can also delay the blanking signals, but I’m not sure what it’s used for.
+
+Before compiling and running it, we have to add the Verilog files of the modules we added to the `jtscratch.qip` file, like so (we already had `scratch_game.v`):
+
+```
+# scratch
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_game.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_video.v ]
+
+# jtframe
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/clocking/jtframe_cen48.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/video/jtframe_vtimer.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/video/jtframe_blank.v ]
+```
+
+The result is a grid like below. We can see that it is shifted right by one pixel, but we are going to investigate that later. Maybe it’s what the delay in `jtframe_blank` is for, but my tests have not been very successful.
