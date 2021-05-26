@@ -59,4 +59,18 @@ module scratch_game(
 	input   [ 3:0]  gfx_en
 );
 
+scratch_video u_video(
+	.rst      ( rst      ),
+	.clk      ( clk      ),
+	.pxl2_cen ( pxl2_cen ),
+	.pxl_cen  ( pxl_cen  ),
+	.LHBL_dly ( LHBL_dly ),
+	.LVBL_dly ( LVBL_dly ),
+	.HS       ( HS       ),
+	.VS       ( VS       ),
+	.red      ( red      ),
+	.green    ( green    ),
+	.blue     ( blue     )
+);
+
 endmodule

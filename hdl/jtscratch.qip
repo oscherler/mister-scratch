@@ -1,2 +1,8 @@
 # scratch
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_game.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_video.v ]
+
+# jtframe
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/clocking/jtframe_cen48.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/video/jtframe_vtimer.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/video/jtframe_blank.v ]
