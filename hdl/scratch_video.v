@@ -59,19 +59,32 @@ u_timer(
 	.VS         ( VS            )
 );
 
-reg  [3:0] r, g, b;
+wire [15:0] rgb;
+reg  [ 7:0] palette_addr;
+
+jtframe_ram #(
+	.dw         ( 16            ),
+	.aw         (  8            ),
+	.simhexfile ( ""            ),
+	.synfile    ( "palette.hex" )
+)(
+	.clk  ( clk          ),
+	.cen  ( 1'b1         ),
+	.data (              ),
+	.addr ( palette_addr ),
+	.we   ( 1'b0         ),
+	.q    ( rgb          )
+);
 
 always @( posedge clk ) if( pxl_cen ) begin
-	r <= 4'h0;
-	g <= H[4] == 1'b0 ? 4'h0 : 4'hf;
-	b <= V[4] == 1'b0 ? 4'h0 : 4'hf;
+	palette_addr <= { V[7:4], H[7:4] };
 end
 
 wire [11:0] col_in, col_out;
 
-assign col_in = { r, g, b };
+assign col_in = rgb[11:0];
 
-jtframe_blank #( .DLY(0), .DW(12) ) u_blank(
+jtframe_blank #( .DLY(2), .DW(12) ) u_blank(
 	.clk        ( clk       ),
 	.pxl_cen    ( pxl_cen   ),
 	.LHBL       ( LHBL      ),
@@ -83,6 +96,6 @@ jtframe_blank #( .DLY(0), .DW(12) ) u_blank(
 	.rgb_out    ( col_out   )
 );
 
-assign { red, green, blue } = col_out;
+assign { blue, green, red } = col_out;
 
 endmodule
