@@ -247,3 +247,76 @@ set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modu
 ```
 
 The result is a grid like below. We can see that it is shifted right by one pixel, but we are going to investigate that later. Maybe it’s what the delay in `jtframe_blank` is for, but my tests have not been very successful.
+
+## Palette RAM
+
+_Git tag: `palette-ram`_
+
+For the next step, we are going to add a memory to hold a colour palette, and make the video display this palette. For the moment we are going to fill the palette at synthesis time using a `.hex` file.
+
+In `scratch_video.v`, we replace the lines between `reg  [3:0] r, g, b;` and `assign col_in = { r, g, b };` with:
+
+```
+wire [15:0] rgb;
+reg  [ 7:0] palette_addr;
+
+jtframe_ram #(
+	.dw         ( 16            ),
+	.aw         (  8            ),
+	.simhexfile ( ""            ),
+	.synfile    ( "palette.hex" )
+)(
+	.clk  ( clk          ),
+	.cen  ( 1'b1         ),
+	.data (              ),
+	.addr ( palette_addr ),
+	.we   ( 1'b0         ),
+	.q    ( rgb          )
+);
+
+always @( posedge clk ) if( pxl_cen ) begin
+	palette_addr <= { V[7:4], H[7:4] };
+end
+
+wire [11:0] col_in, col_out;
+
+assign col_in = rgb[11:0];
+```
+
+We create a RAM with 8 bits of address and 16 bits of data, and fill it at synthesis time with hex file `hdl/palette.hex`, which looks like this:
+
+```
+0000
+0111
+0222
+0333
+0444
+0555
+0666
+0777
+0888
+...
+```
+
+As we have four bits per pixel in our core, the three rightmost hex digits of the RAM data each represent the value of a colour component. We choose the four least significant bits (LSBs) to represent the red component, then green, and finally blue. The four most significant bits (MSBs) are unused and left at 0.
+
+Next we change the `always` block to generate the address for the palette RAM instead of the grid we had before. We take bits 4 to 7 of the horizontal counter, which will increment the palette address by one position every 16 pixels, displaying 16 colours per line, as we have 256 pixels on a line. And to the left of that, we append bits 4 to 7 of the vertical counter, which will increment the palette address by 16 positions every 16 lines. This will result in 16x16-pixel colour blocks, displaying the first 224 colours of our palette.
+
+Finally, we assign the data output of the palette RAM to the `col_in` wire we already have, and we just need to change the order of the colours in the assignment from `col_out` to match the order we decided on, red being on the left:
+
+```
+assign { blue, green, red } = col_out;
+```
+
+After adding the `jtframe_ram` source file to the `.qip` file, we can compile the core, and look at the result.
+
+```
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/ram/jtframe_ram.v ]
+```
+
+We can see that the palette starts two pixels to the right of the edge of the screen, and the rightmost pixels wrap around to the left. This is because it takes a couple of pixel clock cycles to generate the coulour data. At least one with the `<=` assignment in the `always` block (the second pixel probably comes from the fact that, in `jtframe_vtimer`, the `H` counter is initialised to `HB_END = 383`.) To remedy this, we are going to add a delay of two pixels to the blanking signals, using the `DLY` parameter of the `jtframe_blank` module:
+
+```
+jtframe_blank #( .DLY(2), .DW(12) ) u_blank(
+...
+```
