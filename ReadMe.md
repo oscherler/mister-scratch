@@ -298,9 +298,9 @@ We create a RAM with 8 bits of address and 16 bits of data, and fill it at synth
 ...
 ```
 
-As we have four bits per pixel in our core, the three rightmost hex digits of the RAM data each represent the value of a colour component. We choose the four least significant bits (LSBs) to represent the red component, then green, and finally blue. The four most significant bits (MSBs) are unused and left at 0.
+As we have four bits per pixel in our core, the three rightmost hex digits of the RAM data each represent the value of a colour component. We choose the four least significant bits (LSBs) to represent the red component, then green, and finally blue. The four most significant bits (MSBs) are unused and left at `0`.
 
-Next we change the `always` block to generate the address for the palette RAM instead of the grid we had before. We take bits 4 to 7 of the horizontal counter, which will increment the palette address by one position every 16 pixels, displaying 16 colours per line, as we have 256 pixels on a line. And to the left of that, we append bits 4 to 7 of the vertical counter, which will increment the palette address by 16 positions every 16 lines. This will result in 16x16-pixel colour blocks, displaying the first 224 colours of our palette.
+Next we change the `always` block to generate the address for the palette RAM instead of the grid we had before. We take bits `4` to `7` of the horizontal counter, which will increment the palette address by one position every 16 pixels, displaying 16 colours per line, as we have 256 pixels on a line. And to the left of that, we append bits `4` to `7` of the vertical counter, which will increment the palette address by 16 positions every 16 lines. This will result in 16x16-pixel colour blocks, displaying the first 224 colours of our palette.
 
 Finally, we assign the data output of the palette RAM to the `col_in` wire we already have, and we just need to change the order of the colours in the assignment from `col_out` to match the order we decided on, red being on the left:
 
