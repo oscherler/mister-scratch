@@ -59,18 +59,41 @@ module scratch_game(
 	input   [ 3:0]  gfx_en
 );
 
+wire prom_we;
+
+jtframe_dwnld #( .PROM_START( 25'h0 ) )
+u_dwnld(
+	.clk            ( clk           ),
+	.downloading    ( downloading   ),
+	.ioctl_addr     ( ioctl_addr    ),
+	.ioctl_data     ( ioctl_data    ),
+	.ioctl_wr       ( ioctl_wr      ),
+	.prog_addr      ( prog_addr     ),
+	.prog_data      ( prog_data     ),
+	.prog_mask      ( prog_mask     ), // active low
+	.prog_we        ( prog_we       ),
+	.prom_we        ( prom_we       ),
+	.sdram_ack      ( sdram_ack     )
+);
+
 scratch_video u_video(
-	.rst      ( rst      ),
-	.clk      ( clk      ),
-	.pxl2_cen ( pxl2_cen ),
-	.pxl_cen  ( pxl_cen  ),
-	.LHBL_dly ( LHBL_dly ),
-	.LVBL_dly ( LVBL_dly ),
-	.HS       ( HS       ),
-	.VS       ( VS       ),
-	.red      ( red      ),
-	.green    ( green    ),
-	.blue     ( blue     )
+	.rst       ( rst            ),
+	.clk       ( clk            ),
+	// video
+	.pxl2_cen  ( pxl2_cen       ),
+	.pxl_cen   ( pxl_cen        ),
+	.LHBL_dly  ( LHBL_dly       ),
+	.LVBL_dly  ( LVBL_dly       ),
+	.HS        ( HS             ),
+	.VS        ( VS             ),
+	// prog
+	.prog_addr ( prog_addr[8:0] ),
+	.prog_data ( prog_data      ),
+	.prom_we   ( prom_we        ),
+	// colour
+	.red       ( red            ),
+	.green     ( green          ),
+	.blue      ( blue           )
 );
 
 endmodule

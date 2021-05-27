@@ -9,6 +9,10 @@ module scratch_video(
 	output              LVBL_dly,
 	output              HS,
 	output              VS,
+	// PROM
+	input      [ 8:0]   prog_addr,
+	input      [ 7:0]   prog_data,
+	input               prom_we,
 	// Colours
 	output     [ 3:0]   red,
 	output     [ 3:0]   green,
@@ -62,32 +66,32 @@ u_timer(
 wire [15:0] rgb;
 reg  [ 7:0] palette_addr;
 
-jtframe_ram #(
-	.dw      ( 8              ),
-	.aw      ( 8              ),
-	.synfile ("palette_lo.hex")
+jtframe_prom #(
+	.dw ( 8 ),
+	.aw ( 8 )
 )
 u_palette_lo(
-	.clk     ( clk          ),
-	.cen     ( 1'b1         ),
-	.data    (              ),
-	.addr    ( palette_addr ),
-	.we      ( 1'b0         ),
-	.q       ( rgb[7:0]     )
+	.clk     ( clk                    ),
+	.cen     ( 1'b1                   ),
+	.data    ( prog_data              ),
+	.rd_addr ( palette_addr           ),
+	.wr_addr ( prog_addr[8:1]         ),
+	.we      ( prom_we & prog_addr[0] ),
+	.q       ( rgb[7:0]               )
 );
 
-jtframe_ram #(
-	.dw      ( 8              ),
-	.aw      ( 8              ),
-	.synfile ("palette_hi.hex")
+jtframe_prom #(
+	.dw ( 8 ),
+	.aw ( 8 )
 )
 u_palette_hi(
-	.clk     ( clk          ),
-	.cen     ( 1'b1         ),
-	.data    (              ),
-	.addr    ( palette_addr ),
-	.we      ( 1'b0         ),
-	.q       ( rgb[15:8]    )
+	.clk     ( clk                     ),
+	.cen     ( 1'b1                    ),
+	.data    ( prog_data               ),
+	.rd_addr ( palette_addr            ),
+	.wr_addr ( prog_addr[8:1]          ),
+	.we      ( prom_we & ~prog_addr[0] ),
+	.q       ( rgb[15:8]               )
 );
 
 always @( posedge clk ) if( pxl_cen ) begin
