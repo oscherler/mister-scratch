@@ -320,3 +320,238 @@ We can see that the palette starts two pixels to the right of the edge of the sc
 jtframe_blank #( .DLY(2), .DW(12) ) u_blank(
 ...
 ```
+
+## PROM Downloading via MRA
+
+_Git tag: `prom-download`_
+
+The next step is to fill the palette memory from the MiSTer SD card using an MRA file. We will do it in small steps, as it is a consequent modification that is error-prone.
+
+The first setp is to create an MRA file to launch the core:
+
+```xml
+<misterromdescription>
+	<about author="oscherler" source="https://github.com/oscherler" twitter="@oscherler"/>
+	<name>Scratch</name>
+	<rbf>jtscratch</rbf>
+</misterromdescription>
+```
+
+Name it `Scratch.mra` and save it to `/media/fat/` on your MiSTer. Then create a folder called `cores` next to it, and move the `jtscratch.rbf` file into it. After rebooting your MiSTer, the main menu should show you a `Scratch` entry, and selecting it should launch the core. Let’s also update the `copy` target of the Makefile to copy the MRA to the MiSTer, and move the destination of the RBF (don’t forget to change the IP address to that of your MiSTer):
+
+```makefile
+copy:
+	scp Scratch.mra root@192.168.1.118:/media/fat/
+	scp mister/output_1/jtscratch.rbf root@192.168.1.118:/media/fat/cores/
+```
+
+_Git tag of the above: `prom-download-1`_
+
+Once this works, we are going to split the 16-bit palette RAM into two 8-bit RAMs, because PROM downloading is done by byte. First, create `hdl/palette_lo.hex` with the two rightmost hex digits of each line of the `palette.hex` file (the 8 LSBs), and `hdl/palette_hi.hex` with the two leftmost hex digits of each line of the `palette.hex` file (the 8 MSBs):
+
+`hdl/palette_lo.hex` (excerpt):
+
+```
+00
+11
+22
+33
+44
+55
+66
+77
+88
+99
+...
+```
+
+`hdl/palette_hi.hex` (excerpt):
+
+```
+00
+01
+02
+03
+04
+05
+06
+07
+08
+09
+...
+```
+
+Then replace the 16-bit `jtframe_ram` in `hdl/scratch_video.v` two 8-bit `jtframe_ram`s. The low RAM is initialised with the `palette_lo.hex` file and outputs bits `0` to `7` of the `rgb` signal, and the high RAM is initialised with the `palette_hi.hex` file and outputs bits `8` to `15` of the `rgb` signal:
+
+```verilog
+jtframe_ram #(
+     .dw      ( 8              ),
+     .aw      ( 8              ),
+     .synfile ("palette_lo.hex")
+)
+u_palette_lo(
+     .clk     ( clk          ),
+     .cen     ( 1'b1         ),
+     .data    (              ),
+     .addr    ( palette_addr ),
+     .we      ( 1'b0         ),
+     .q       ( rgb[7:0]     )
+);
+
+jtframe_ram #(
+     .dw      ( 8              ),
+     .aw      ( 8              ),
+     .synfile ("palette_hi.hex")
+)
+u_palette_hi(
+     .clk     ( clk          ),
+     .cen     ( 1'b1         ),
+     .data    (              ),
+     .addr    ( palette_addr ),
+     .we      ( 1'b0         ),
+     .q       ( rgb[15:8]    )
+);
+```
+
+_Git tag of the above: `prom-download-2`_
+
+After checking that it still works, the final step is to add PROM downloading. First, we are going to add the PROM data to the MRA file:
+
+```xml
+<misterromdescription>
+	<about author="oscherler" source="https://github.com/oscherler" twitter="@oscherler"/>
+	<name>Scratch</name>
+	<rbf>jtscratch</rbf>
+	<rom index="0">
+		<!-- palette RAM, 512 bytes, starts at 0x0000 -->
+		<part>
+			0000 0111 0222 0333 0444 0555 0666 0777
+			0888 0999 0aaa 0bbb 0ccc 0ddd 0eee 0fff
+			0000 0001 0002 0003 0004 0005 0006 0007
+			0008 0009 000a 000b 000c 000d 000e 000f
+			0000 0010 0020 0030 0040 0050 0060 0070
+			0080 0090 00a0 00b0 00c0 00d0 00e0 00f0
+			0000 0100 0200 0300 0400 0500 0600 0700
+			0800 0900 0a00 0b00 0c00 0d00 0e00 0f00
+			0000 0011 0022 0033 0044 0055 0066 0077
+			0088 0099 00aa 00bb 00cc 00dd 00ee 00ff
+			0000 0101 0202 0303 0404 0505 0606 0707
+			0808 0909 0a0a 0b0b 0c0c 0d0d 0e0e 0f0f
+			0000 0110 0220 0330 0440 0550 0660 0770
+			0880 0990 0aa0 0bb0 0cc0 0dd0 0ee0 0ff0
+			0000 0111 0222 0333 0444 0555 0666 0777
+			0888 0999 0aaa 0bbb 0ccc 0ddd 0eee 0fff
+			0000 0001 0002 0003 0004 0005 0006 0007
+			0008 0009 000a 000b 000c 000d 000e 000f
+			0000 0010 0020 0030 0040 0050 0060 0070
+			0080 0090 00a0 00b0 00c0 00d0 00e0 00f0
+			0000 0100 0200 0300 0400 0500 0600 0700
+			0800 0900 0a00 0b00 0c00 0d00 0e00 0f00
+			0000 0011 0022 0033 0044 0055 0066 0077
+			0088 0099 00aa 00bb 00cc 00dd 00ee 00ff
+			0000 0101 0202 0303 0404 0505 0606 0707
+			0808 0909 0a0a 0b0b 0c0c 0d0d 0e0e 0f0f
+			0000 0110 0220 0330 0440 0550 0660 0770
+			0880 0990 0aa0 0bb0 0cc0 0dd0 0ee0 0ff0
+			0000 0000 0000 0000 0000 0000 0000 0000
+			0000 0000 0000 0000 0000 0000 0000 0000
+			0000 0000 0000 0000 0000 0000 0000 0000
+			0000 0000 0000 0000 0000 0000 0000 0000
+		</part>
+	</rom>
+</misterromdescription>
+```
+
+It’s the same data as the first `palette.hex` file we created, formatted for compactness.
+
+Next, we add a `jtframe_dwnld` to `scratch_game.v`, to handle the downloading of the data from the MRA:
+
+```verilog
+wire prom_we;
+
+jtframe_dwnld #( .PROM_START( 25'h0 ) )
+u_dwnld(
+	.clk            ( clk           ),
+	.downloading    ( downloading   ),
+	.ioctl_addr     ( ioctl_addr    ),
+	.ioctl_data     ( ioctl_data    ),
+	.ioctl_wr       ( ioctl_wr      ),
+	.prog_addr      ( prog_addr     ),
+	.prog_data      ( prog_data     ),
+	.prog_mask      ( prog_mask     ), // active low
+	.prog_we        ( prog_we       ),
+	.prom_we        ( prom_we       ),
+	.sdram_ack      ( sdram_ack     )
+);
+```
+
+The `PROM_START` parameter specifies that the data starting from address `0` goes to PROMs, and not to the SDRAM, and therefore the `prom_we` is asserted. We now need to pass the `prog_addr`, `prog_data`, and `prom_we` signals to `scratch_video`:
+
+`scratch_game.v`:
+
+```verilog
+...
+	.HS        ( HS             ),
+	.VS        ( VS             ),
+	// prog
+	.prog_addr ( prog_addr[8:0] ),
+	.prog_data ( prog_data      ),
+	.prom_we   ( prom_we        ),
+	// colour
+	.red       ( red            ),
+...
+```
+
+`scratch_video.v`:
+
+```
+...
+	output              VS,
+	// PROM
+	input      [ 8:0]   prog_addr,
+	input      [ 7:0]   prog_data,
+	input               prom_we,
+	// Colours
+	output     [ 3:0]   red,
+...
+```
+
+Next, we replace the two `jtframe_ram`s with two `jtframe_prom`s:
+
+```verilog
+jtframe_prom #(
+	.dw ( 8 ),
+	.aw ( 8 )
+)
+u_palette_lo(
+	.clk     ( clk                    ),
+	.cen     ( 1'b1                   ),
+	.data    ( prog_data              ),
+	.rd_addr ( palette_addr           ),
+	.wr_addr ( prog_addr[8:1]         ),
+	.we      ( prom_we & prog_addr[0] ),
+	.q       ( rgb[7:0]               )
+);
+
+jtframe_prom #(
+	.dw ( 8 ),
+	.aw ( 8 )
+)
+u_palette_hi(
+	.clk     ( clk                     ),
+	.cen     ( 1'b1                    ),
+	.data    ( prog_data               ),
+	.rd_addr ( palette_addr            ),
+	.wr_addr ( prog_addr[8:1]          ),
+	.we      ( prom_we & ~prog_addr[0] ),
+	.q       ( rgb[15:8]               )
+```
+
+The trick here is that we take bits `1` to `8` as the PROM address for both PROMs, and we use bit `0` to determine which PROM takes the bytes at even addresses (`u_palette_hi`), and wich the bytes at odd addresses (`u_palette_lo`), using the `we` (write enable) input. The `jtframe_prom` has two address inputs: `rd_addr` is used for reading, and thus takes our `palette_addr` address, and `wr_addr` is used for writing, and takes the new `prog_addr` address. `prog_data` goes to the `data` input, that was previously not connected, as we were never writing to the RAMs.
+
+Finally, let’s not forget to add the newly in-use source files to our `.qip` file:
+
+```tcl
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/ram/jtframe_prom.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/sdram/jtframe_dwnld.v ]
+```
