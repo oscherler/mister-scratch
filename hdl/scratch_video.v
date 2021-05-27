@@ -63,17 +63,31 @@ wire [15:0] rgb;
 reg  [ 7:0] palette_addr;
 
 jtframe_ram #(
-	.dw         ( 16            ),
-	.aw         (  8            ),
-	.simhexfile ( ""            ),
-	.synfile    ( "palette.hex" )
-)(
-	.clk  ( clk          ),
-	.cen  ( 1'b1         ),
-	.data (              ),
-	.addr ( palette_addr ),
-	.we   ( 1'b0         ),
-	.q    ( rgb          )
+	.dw      ( 8              ),
+	.aw      ( 8              ),
+	.synfile ("palette_lo.hex")
+)
+u_palette_lo(
+	.clk     ( clk          ),
+	.cen     ( 1'b1         ),
+	.data    (              ),
+	.addr    ( palette_addr ),
+	.we      ( 1'b0         ),
+	.q       ( rgb[7:0]     )
+);
+
+jtframe_ram #(
+	.dw      ( 8              ),
+	.aw      ( 8              ),
+	.synfile ("palette_hi.hex")
+)
+u_palette_hi(
+	.clk     ( clk          ),
+	.cen     ( 1'b1         ),
+	.data    (              ),
+	.addr    ( palette_addr ),
+	.we      ( 1'b0         ),
+	.q       ( rgb[15:8]    )
 );
 
 always @( posedge clk ) if( pxl_cen ) begin
