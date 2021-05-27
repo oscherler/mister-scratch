@@ -8,7 +8,7 @@ Learning MiSTer FPGA core development by building a core from scratch using jote
 
 The first step is to add [`jtframe`][jtframe] as a submodule. I chose commit `2793a532971`, as it was the version used by the [Bubble Bobble][jtbubl] core when I started with `jtframe`:
 
-```
+```shell
 git submodule add https://github.com/jotego/jtframe modules/jtframe
 cd modules/jtframe
 git checkout 2793a532971
@@ -17,7 +17,7 @@ cd ../..
 
 We also copy [`setprj.sh`][setprj] from the Bubble Bobble core, and add a `Makefile` for shortcuts:
 
-```
+```makefile
 compile:
 	jtcore -mr scratch
 	@rmdir mist sidi
@@ -49,7 +49,7 @@ For a minimal core that does nothing, we only need three files, that we put in t
 
 `hdl/jtscratch.qip`:
 
-```
+```tcl
 # scratch
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_game.v ]
 ```
@@ -75,7 +75,7 @@ JTFRAME_ARY=4
 
 Note that the `red`, `green`, and `blue` ports are on 4 bits, matching the `COLORW` macro in `jtscratch.def`.
 
-```
+```verilog
 //================================================================================
 //  SCRATCH GAME
 //
@@ -146,7 +146,7 @@ The important parts here are:
 * The name (`scratch_game`) of the module we define in `scratch_game.v` is configured as `GAMETOP` in `jtscratch.def`;
 * The input and output ports of the `scratch_game` module match its instantiation by `jtframe` in `modules/jtframe/hdl/mister/jtframe_emu.sv`:
 
-	```
+	```verilog
 	`GAMETOP u_game
 	(
 		.rst          ( game_rst         ),
@@ -158,7 +158,7 @@ The important parts here are:
 
 We can now build our core-that-does-nothing. Make sure you have sourced `setprj.sh` for the shell session, and type `make`:
 
-```
+```shell
 source setprj.sh
 make
 ```
@@ -193,7 +193,7 @@ For the blanking and sync signals, we use the `jtframe_vtimer` (video timer) mod
 
 In addition to the blanking and sync signals, we also output the horizontal and vertical counters, `H` and `vdump`, to generate our grid.
 
-```
+```verilog
 jtframe_vtimer #(
 	.HB_START( 9'd255 ),
 	.HS_START( 9'd287 ),
@@ -220,7 +220,7 @@ u_timer(
 
 For the grid, we are going to test bit 4 of the horizontal and vertical counters, to draw 16x16 pixel squares:
 
-```
+```verilog
 reg  [3:0] r, g, b;
 
 always @( posedge clk ) if( pxl_cen ) begin
@@ -235,7 +235,7 @@ Finally, we pass the video signals to a `jtframe_blank` instance, that will set 
 
 Before compiling and running it, we have to add the Verilog files of the modules we added to the `jtscratch.qip` file, like so (we already had `scratch_game.v`):
 
-```
+```tcl
 # scratch
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_game.v ]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scratch_video.v ]
@@ -256,7 +256,7 @@ For the next step, we are going to add a memory to hold a colour palette, and ma
 
 In `scratch_video.v`, we replace the lines between `reg  [3:0] r, g, b;` and `assign col_in = { r, g, b };` with:
 
-```
+```verilog
 wire [15:0] rgb;
 reg  [ 7:0] palette_addr;
 
@@ -304,19 +304,19 @@ Next we change the `always` block to generate the address for the palette RAM in
 
 Finally, we assign the data output of the palette RAM to the `col_in` wire we already have, and we just need to change the order of the colours in the assignment from `col_out` to match the order we decided on, red being on the left:
 
-```
+```verilog
 assign { blue, green, red } = col_out;
 ```
 
 After adding the `jtframe_ram` source file to the `.qip` file, we can compile the core, and look at the result.
 
-```
+```tcl
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../modules/jtframe/hdl/ram/jtframe_ram.v ]
 ```
 
 We can see that the palette starts two pixels to the right of the edge of the screen, and the rightmost pixels wrap around to the left. This is because it takes a couple of pixel clock cycles to generate the coulour data. At least one with the `<=` assignment in the `always` block (the second pixel probably comes from the fact that, in `jtframe_vtimer`, the `H` counter is initialised to `HB_END = 383`.) To remedy this, we are going to add a delay of two pixels to the blanking signals, using the `DLY` parameter of the `jtframe_blank` module:
 
-```
+```verilog
 jtframe_blank #( .DLY(2), .DW(12) ) u_blank(
 ...
 ```
