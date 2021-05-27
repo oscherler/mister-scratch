@@ -2,6 +2,8 @@
 
 Learning MiSTer FPGA core development by building a core from scratch using jotego’s `jtframe` framework.
 
+This is a work in progress.
+
 ## Setting Up
 
 **Note:** This document currently assumes that you have a Linux machine or VM with Quartus 17.1 and `jtframe` dependencies installed. Sorry for taking that shortcut, but that’s a job for a whole other document.
@@ -73,7 +75,7 @@ JTFRAME_ARY=4
 
 `hdl/scratch_game.v`:
 
-Note that the `red`, `green`, and `blue` ports are on 4 bits, matching the `COLORW` macro in `jtscratch.def`.
+Note that the `red`, `green`, and `blue` ports are on 4 bits, matching the `COLORW` macro in `jtscratch.def`.
 
 ```verilog
 //================================================================================
@@ -171,7 +173,7 @@ The RBF is located at `mister/output_1/jtscratch.rbf`, and you can install it on
 
 _Git tag: `video-grid`_
 
-Next we will add some video output. First we add a new file, `hdl/scratch_video.v`. This module will take `rst` and `clk`, the 48 MHz system clock, as inputs, and generate:
+Next we will add some video output. First we add a new file, `hdl/scratch_video.v`. This module will take `rst` and `clk`, the 48 MHz system clock, as inputs, and generate:
 
 * The 6 MHz and 12 MHz pixel clock enables, `pxl_cen` and `pxl2_cen`;
 * The horizontal and vertical blanking signals, `LHBL_dly` and `LVBL_dly`;
@@ -191,7 +193,7 @@ For the blanking and sync signals, we use the `jtframe_vtimer` (video timer) mod
 * by default, the vertical sync signal lasts for 3 lines;
 * the vertical blanking signal ends 30 lines later (back porch), at 263 (`VB_END`).
 
-In addition to the blanking and sync signals, we also output the horizontal and vertical counters, `H` and `vdump`, to generate our grid.
+In addition to the blanking and sync signals, we also output the horizontal and vertical counters, `H` and `vdump`, to generate our grid.
 
 ```verilog
 jtframe_vtimer #(
@@ -545,6 +547,7 @@ u_palette_hi(
 	.wr_addr ( prog_addr[8:1]          ),
 	.we      ( prom_we & ~prog_addr[0] ),
 	.q       ( rgb[15:8]               )
+);
 ```
 
 The trick here is that we take bits `1` to `8` as the PROM address for both PROMs, and we use bit `0` to determine which PROM takes the bytes at even addresses (`u_palette_hi`), and wich the bytes at odd addresses (`u_palette_lo`), using the `we` (write enable) input. The `jtframe_prom` has two address inputs: `rd_addr` is used for reading, and thus takes our `palette_addr` address, and `wr_addr` is used for writing, and takes the new `prog_addr` address. `prog_data` goes to the `data` input, that was previously not connected, as we were never writing to the RAMs.
